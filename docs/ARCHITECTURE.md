@@ -20,7 +20,8 @@
 The adapter defers privately before doing work, submits a bounded job, and processes every
 accepted screenshot independently. Downloading uses async HTTP; Pillow and OCR execute in
 worker threads. One actual Discord message reply carries all results with mentions disabled.
-Long reports become text attachments. `ATTACH_DIAGNOSTICS=true` enables diagnostic JSON on
+Each screenshot gets a compact text attachment; larger batches put the individual files in
+a ZIP to stay within the ten-attachment limit. `ATTACH_DIAGNOSTICS=true` enables diagnostic JSON on
 both replies and corrections; production defaults to no JSON attachment. Controls
 remain on the private interaction message for ten minutes; only the original requester can
 edit. A correction snapshots its screenshot index so changing the dropdown while a modal is

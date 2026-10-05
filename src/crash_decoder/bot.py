@@ -4,6 +4,7 @@ import json
 import logging
 import os
 import time
+import zipfile
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -16,7 +17,7 @@ from .decoder import Decoder
 from .jobs import BusyError, JobQueue
 from .layout import parse_layout
 from .models import Result
-from .report import diagnostic, discord_summary
+from .report import diagnostic, discord_summary, render_screenshot
 
 log = logging.getLogger(__name__)
 HEALTH = Path("/tmp/crash-decoder-health") if os.name != "nt" else Path(".cache/health")
@@ -48,19 +49,27 @@ def collect_images(message: discord.Message) -> list[tuple[str, str]]:
 
 
 def payload(results: list[Result], *, attach_diagnostics: bool = False) -> dict:
-    summary, full = discord_summary(results)
+    traces = [
+        (f"crash-trace-{number}.txt", render_screenshot(result, number).encode())
+        for number, result in enumerate(results, 1)
+    ]
     files = []
+    # Discord permits ten files per message; keep larger batches in one reply.
+    if len(traces) + int(attach_diagnostics) > 10:
+        archive = io.BytesIO()
+        with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_DEFLATED) as zipped:
+            for filename, content in traces:
+                zipped.writestr(filename, content)
+        archive.seek(0)
+        files.append(discord.File(archive, filename="crash-traces.zip"))
+    else:
+        files.extend(discord.File(io.BytesIO(content), filename=name) for name, content in traces)
     if attach_diagnostics:
         files.append(
             discord.File(io.BytesIO(diagnostic(results).encode()), filename="crash-diagnostic.json")
         )
-    if full:
-        files.insert(0, discord.File(io.BytesIO(full.encode()), filename="crash-trace.txt"))
-    content = discord.utils.escape_markdown(summary)
-    if len(content) > 2000:
-        content = "Crash decode — full trace attached."
-        if not full:
-            files.insert(0, discord.File(io.BytesIO(summary.encode()), filename="crash-trace.txt"))
+    # Escaping can double the text length; reserve room for all twenty screenshot rows.
+    content = discord.utils.escape_markdown(discord_summary(results, limit=900))
     return {"content": content, "files": files, "allowed_mentions": discord.AllowedMentions.none()}
 
 

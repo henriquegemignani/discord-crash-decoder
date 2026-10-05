@@ -1,6 +1,7 @@
 import asyncio
 import copy
 import json
+import zipfile
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock
 
@@ -103,6 +104,7 @@ async def test_one_actual_reply_and_private_link(
         assert arguments["message_reference"] == {"message_id": 101, "channel_id": 2, "guild_id": 1}
         assert "Unreadable image" in arguments["content"]
         filenames = {attachment["filename"] for attachment in arguments.get("attachments", [])}
+        assert {"crash-trace-1.txt", "crash-trace-2.txt"} <= filenames
         assert ("crash-diagnostic.json" in filenames) is attach_diagnostics
         response = request.edit_original_response.call_args.kwargs
         assert reply.jump_url in response["content"]
@@ -129,14 +131,34 @@ async def test_private_error_when_cannot_reply(bundle, decoder):
 
 
 @pytest.mark.parametrize("attach_diagnostics", [False, True])
-def test_long_report_attached(decoder, attach_diagnostics):
-    results = [decoder.text("IP: 0x80003100", "X" * 150) for _ in range(20)]
+@pytest.mark.parametrize("count", [2, 9, 10, 20])
+def test_individual_traces_and_large_batches(decoder, attach_diagnostics, count):
+    results = [decoder.text("IP: 0x80003100", "_*`" * 150) for _ in range(count)]
     data = payload(results, attach_diagnostics=attach_diagnostics)
-    assert len(data["content"]) <= 2000
-    expected = {"crash-trace.txt"}
-    if attach_diagnostics:
-        expected.add("crash-diagnostic.json")
-    assert {f.filename for f in data["files"]} == expected
+    try:
+        assert len(data["content"]) <= 2000
+        assert all(f"Screenshot {i}:" in data["content"] for i in range(1, count + 1))
+        trace_names = {f"crash-trace-{i}.txt" for i in range(1, count + 1)}
+        archived = count + int(attach_diagnostics) > 10
+        expected = {"crash-traces.zip"} if archived else trace_names.copy()
+        if attach_diagnostics:
+            expected.add("crash-diagnostic.json")
+        assert {f.filename for f in data["files"]} == expected
+        assert len(data["files"]) <= 10
+        if archived:
+            archive = next(f for f in data["files"] if f.filename == "crash-traces.zip")
+            with zipfile.ZipFile(archive.fp) as zipped:
+                assert set(zipped.namelist()) == trace_names
+                for i in range(1, count + 1):
+                    assert (
+                        zipped.read(f"crash-trace-{i}.txt").decode().startswith(f"Screenshot {i}:")
+                    )
+        else:
+            for i, attachment in enumerate(data["files"][:count], 1):
+                assert attachment.fp.read().decode().startswith(f"Screenshot {i}:")
+    finally:
+        for attachment in data["files"]:
+            attachment.close()
 
 
 def test_diagnostics_preserve_debug_unknown_and_failed_results(decoder):
@@ -180,6 +202,11 @@ async def test_corrections_use_existing_text_preserve_original_and_modal_index(
     assert view.results[1] is results[1]
     assert view.results[0].resolutions[0].offset == 0
     filenames = {attachment.filename for attachment in reply.edit.call_args.kwargs["attachments"]}
+    assert {"crash-trace-1.txt", "crash-trace-2.txt"} <= filenames
+    first_trace = reply.edit.call_args.kwargs["attachments"][0].fp.read().decode()
+    assert first_trace.startswith("Screenshot 1: first - GM8E01_00")
+    assert view.results[0].resolutions[0].symbol in first_trace
+    assert "Text corrected" not in first_trace
     assert ("crash-diagnostic.json" in filenames) is attach_diagnostics
     denied = interaction(user=2)
     assert not await view.interaction_check(denied)

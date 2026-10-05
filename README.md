@@ -1,13 +1,17 @@
 # Discord Crash Decoder
 
 A Python bot and local decoder for Metroid Prime and Echoes crash screens. Right-click a
-message, choose **Apps → Decode crash**, and receive one reply containing every screenshot's
-result. The bot acknowledges privately before downloading or running OCR. Private controls
+message, choose **Apps → Decode crash**, and receive one reply with a separate
+`crash-trace-N.txt` attachment for each screenshot. Each trace contains the screenshot name,
+build, crash description, and function names with offsets and source files. Larger batches
+use `crash-traces.zip` containing the individual traces to fit Discord's attachment limit.
+The bot acknowledges privately before downloading or running OCR. Private controls
 let the requester select a game/build, correct OCR text, and supply verified REL layout data.
 Diagnostic JSON attachments are disabled by default. Set `ATTACH_DIAGNOSTICS=true` on a debug
 instance to attach `crash-diagnostic.json` to replies and corrections. This runtime setting
-applies to every decoded game build, including unknown builds and per-image errors. Long
-text traces are still attached when needed in production.
+applies to every decoded game build, including unknown builds and per-image errors. Detection
+evidence, OCR corrections, and bundle checksums stay in diagnostic JSON. Unresolved addresses
+and per-image errors remain visible in the text traces.
 
 The included registry maps 15 GameCube/Wii configurations. Screenshot parsing and automatic
 detection are verified against the seven supplied screenshots for **GM8E01_00, GM8E01_02,
