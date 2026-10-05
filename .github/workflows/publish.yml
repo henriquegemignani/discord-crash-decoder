@@ -1,0 +1,76 @@
+name: Publish
+on:
+  push:
+    tags: ['v*']
+    branches: [main]
+permissions:
+  contents: read
+  packages: write
+concurrency:
+  group: publish-${{ github.sha }}
+  cancel-in-progress: false
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Image name
+        id: image
+        shell: bash
+        run: echo "name=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+      - name: Validate release container
+        run: |
+          docker build --target test -t crash-decoder:test .
+          docker run --rm crash-decoder:test
+          docker build -t crash-decoder:release .
+          docker run --rm --entrypoint python -v "$PWD/tests:/app/tests:ro" -v "$PWD/scripts:/app/scripts:ro" crash-decoder:release /app/scripts/smoke.py
+      - uses: docker/metadata-action@v5
+        id: meta
+        with:
+          images: ${{ steps.image.outputs.name }}
+          tags: |
+            type=raw,value=sha-${{ github.sha }}
+            type=ref,event=tag
+            type=raw,value=main,enable=${{ github.ref == 'refs/heads/main' }}
+      - name: Preserve existing immutable commit image
+        id: existing
+        env:
+          IMAGE: ${{ steps.image.outputs.name }}
+        shell: bash
+        run: |
+          if docker buildx imagetools inspect "$IMAGE:sha-$GITHUB_SHA" > /tmp/existing-image.txt 2>/dev/null; then
+            digest=$(awk '/^Digest:/ {print $2; exit}' /tmp/existing-image.txt)
+            test -n "$digest"
+            echo "found=true" >> "$GITHUB_OUTPUT"
+            echo "digest=$digest" >> "$GITHUB_OUTPUT"
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: docker/build-push-action@v6
+        if: steps.existing.outputs.found != 'true'
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Tag existing commit image
+        if: steps.existing.outputs.found == 'true'
+        env:
+          IMAGE: ${{ steps.image.outputs.name }}
+          DIGEST: ${{ steps.existing.outputs.digest }}
+          TAGS: ${{ steps.meta.outputs.tags }}
+        shell: bash
+        run: |
+          while IFS= read -r tag; do
+            if [ -n "$tag" ] && [ "$tag" != "$IMAGE:sha-$GITHUB_SHA" ]; then
+              docker buildx imagetools create --tag "$tag" "$IMAGE@$DIGEST"
+            fi
+          done <<< "$TAGS"

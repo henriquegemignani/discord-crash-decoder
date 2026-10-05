@@ -1,0 +1,48 @@
+name: Update symbols
+on:
+  workflow_dispatch:
+    inputs:
+      prime_revision:
+        description: Prime upstream revision (branch, tag or SHA)
+        default: main
+      echoes_revision:
+        description: Echoes upstream revision (branch, tag or SHA)
+        default: main
+permissions:
+  contents: write
+  pull-requests: write
+concurrency:
+  group: update-symbols
+  cancel-in-progress: false
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: '0.12.13'
+      - run: uv sync --locked
+      - name: Save previous bundle
+        run: cp src/crash_decoder/data/symbols.json /tmp/previous-symbols.json
+      - name: Generate bundle
+        env:
+          PRIME_REVISION: ${{ inputs.prime_revision }}
+          ECHOES_REVISION: ${{ inputs.echoes_revision }}
+        run: uv run crash-decoder symbols update --game all --prime-revision "$PRIME_REVISION" --echoes-revision "$ECHOES_REVISION"
+      - run: uv run crash-decoder symbols validate
+      - name: Test updated maps with real screenshots
+        run: |
+          docker build --target test -t crash-decoder:test .
+          docker run --rm crash-decoder:test
+      - name: Summarize changes
+        run: uv run crash-decoder symbols diff /tmp/previous-symbols.json src/crash_decoder/data/symbols.json > /tmp/symbol-changes.md
+      - uses: peter-evans/create-pull-request@v7
+        with:
+          branch: automation/update-symbols
+          title: Update decomp symbol bundle
+          commit-message: Update decomp symbol bundle
+          body-path: /tmp/symbol-changes.md
+          add-paths: |
+            src/crash_decoder/data/symbols.json
+            src/crash_decoder/data/symbols.lock.json
