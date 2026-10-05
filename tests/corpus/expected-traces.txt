@@ -1,0 +1,108 @@
+Expected traces derived from labeled addresses and pinned upstream metadata; not live debugger verification.
+
+Crash decode
+Saved return addresses are preserved without call-site subtraction.
+
+Screenshot 1: prime-allocation.png
+Build: GM8E01_00 (identified)
+IP consistent with main executable sections
+Unique full build string; modified code remains unverified.
+IP 0x802d68c8: rs_debugger_printf(char const *, ...) +0x9c [main.dol; Kyoto/Basics/RAssertDolphin.cpp]
+Return 0x802d68e0: rs_debugger_printf(char const *, ...) +0xb4 [main.dol; Kyoto/Basics/RAssertDolphin.cpp]
+Return 0x80315a10: CMemory::Alloc(unsigned long, IAllocator::EHint, IAllocator::EScope, IAllocator::EType, const CCallStack&) +0x7c [main.dol; Kyoto/Alloc/CMemory.cpp]
+Return 0x803395e0: CResFactory::SLoadingData::PumpDecompression(unsigned int) +0x138 [main.dol; Kyoto/CResFactory.cpp]
+Return 0x80339a64: CResFactory::PumpResource(const rstl::list<CResFactory::SLoadingData, rstl::rmemory_allocator>::iterator&, unsigned int) +0x60 [main.dol; Kyoto/CResFactory.cpp]
+Return 0x80339c84: CResFactory::AsyncIdle(unsigned int) +0xb4 [main.dol; Kyoto/CResFactory.cpp]
+Return 0x80004d80: CMain::AsyncIdle(unsigned int) +0x98 [main.dol; MetroidPrime/main.cpp]
+Return 0x80005644: CMain::RsMain(int, const char* const*) +0x87c [main.dol; MetroidPrime/main.cpp]
+Return 0x80008558: main +0x54 [main.dol; MetroidPrime/main.cpp]
+
+Screenshot 2: echoes-allocation.png
+Build: G2ME01 (identified)
+IP consistent with main executable sections
+Unique full build string; modified code remains unverified.
+IP 0x8028c36c: rs_debugger_printf(char const *, ...) +0xe0 [main.dol; Kyoto/Basics/RAssertDolphin.cpp]
+Return 0x8028c384: rs_debugger_printf(char const *, ...) +0xf8 [main.dol; Kyoto/Basics/RAssertDolphin.cpp]
+Return 0x802ce49c: CMemory::Alloc(unsigned long, IAllocator::EHint, IAllocator::EScope, IAllocator::EType, const CCallStack&) +0xb0 [main.dol; Kyoto/Alloc/CMemory.cpp]
+Return 0x802c4c34: CTexture::InitBitmapBuffers(ETexelFormat, short, short, int) +0x174 [main.dol; Kyoto/Graphics/DolphinCTexture.cpp]
+Return 0x802c5e20: CTexture::CTexture(CInputStream&, CTexture::EAutoMipmap, CTexture::EBlackKey) +0x18c [main.dol; Kyoto/Graphics/DolphinCTexture.cpp]
+Return 0x802c48c0: FTextureFactory(SObjectTag const &, CInputStream &, CVParamTransfer const &) +0x48 [main.dol; Kyoto/Graphics/DolphinCTexture.cpp]
+Return 0x802f9318: CFactoryMgr::MakeObjectFromMemory(const SObjectTag&, const rstl::auto_ptr<unsigned char>&, int, bool, const CVParamTransfer&) +0x468 [main.dol; Kyoto/CFactoryMgr.cpp]
+Return 0x802fa274: CResFactory::PumpResource(const rstl::list<CResFactory::SLoadingData, rstl::rmemory_allocator>::iterator&, unsigned int) +0xb8 [main.dol; Kyoto/CResFactory.cpp]
+Return 0x802fa44c: CResFactory::AsyncIdle(unsigned int, bool) +0xc8 [main.dol; Kyoto/CResFactory.cpp]
+
+Screenshot 3: echoes-exception.png
+Build: G2ME01 (identified)
+IP consistent with main executable sections
+Unique full build string; modified code remains unverified.
+IP 0x802b3f90: CDrawStringOptions::operator=(const CDrawStringOptions&) +0x30 [main.dol; Kyoto/Text/CFontRenderState.cpp]
+Return 0x806bf338: unresolved (Outside known function ranges)
+Return 0x802b807c: CTextExecuteBuffer::AddPopState() +0x94 [main.dol; Kyoto/Text/CTextExecuteBuffer.cpp]
+Return 0x802b9d24: CTextParser::ParseTag(CTextExecuteBuffer&, const wchar_t*, int, const rstl::vector<rstl::pair<unsigned int, unsigned int>, rstl::rmemory_allocator>*) +0x6e8 [main.dol; Kyoto/Text/CTextParser.cpp]
+Return 0x802ba600: CTextParser::ParseText(CTextExecuteBuffer&, const wchar_t*, int, const rstl::vector<rstl::pair<unsigned int, unsigned int>, rstl::rmemory_allocator>*) +0xd0 [main.dol; Kyoto/Text/CTextParser.cpp]
+Return 0x8027c964: CGuiTextSupport::CheckAndRebuildTextBuffer() const +0x22c [main.dol; Kyoto/Text/CGuiTextSupport.cpp]
+Return 0x8027c17c: CGuiTextSupport::CheckAndRebuildRenderBuffer() const +0x48 [main.dol; Kyoto/Text/CGuiTextSupport.cpp]
+Return 0x8027d008: CGuiTextSupport::GetIsTextSupportFinishedLoading() const +0x18 [main.dol; Kyoto/Text/CGuiTextSupport.cpp]
+Return 0x80020b2c: CCredits::Update(float, CArchitectureQueue&) +0x23c [main.dol; MetroidPrime/CCredits.cpp]
+Return 0x80021378: CCredits::OnMessage(const CArchitectureMessage&, CArchitectureQueue&) +0x54 [main.dol; MetroidPrime/CCredits.cpp]
+
+Screenshot 4: prime-exception.png
+Build: GM8E01_00 (identified)
+IP consistent with main executable sections
+Unique full build string; modified code remains unverified.
+IP 0x80351718: CGameAllocator::FreeNormalAllocation(const void*) +0x18 [main.dol; Kyoto/Alloc/CGameAllocator.cpp]
+Return 0x80315978: CMemory::Free(const void*) +0x48 [main.dol; Kyoto/Alloc/CMemory.cpp]
+Return 0x80351950: CGameAllocator::Free(const void*) +0x90 [main.dol; Kyoto/Alloc/CGameAllocator.cpp]
+Return 0x80315978: CMemory::Free(const void*) +0x48 [main.dol; Kyoto/Alloc/CMemory.cpp]
+Return 0x800557bc: CActor::~CActor() +0xcc [main.dol; MetroidPrime/CActor.cpp]
+Return 0x800b5470: CScriptCameraWaypoint::~CScriptCameraWaypoint() +0x34 [main.dol; MetroidPrime/ScriptObjects/CScriptCameraWaypoint.cpp]
+Return 0x8004c210: CStateManager::ClearGraveyard() +0x7c [main.dol; MetroidPrime/CStateManager.cpp]
+Return 0x8004aba0: CStateManager::Update(float) +0x3d4 [main.dol; MetroidPrime/CStateManager.cpp]
+Return 0x80024858: CMFGame::OnMessage(const CArchitectureMessage&, CArchitectureQueue&) +0x1bc [main.dol; MetroidPrime/CMFGame.cpp]
+Return 0x80052214: CIOWinManager::DistributeOneMessage(const CArchitectureMessage&, CArchitectureQueue&) +0x74 [main.dol; MetroidPrime/CIOWinManager.cpp]
+
+Screenshot 5: prime-loop.png
+Build: GM8E01_00 (identified)
+IP consistent with main executable sections
+Unique full build string; modified code remains unverified.
+IP 0x802d68c8: rs_debugger_printf(char const *, ...) +0x9c [main.dol; Kyoto/Basics/RAssertDolphin.cpp]
+Return 0x802d68e0: rs_debugger_printf(char const *, ...) +0xb4 [main.dol; Kyoto/Basics/RAssertDolphin.cpp]
+Return 0x800075b4: InfiniteLoopAlarm(OSAlarm *, OSContext *) +0x3c [main.dol; MetroidPrime/main.cpp]
+Return 0x8037e700: DecrementerExceptionCallback +0x1f0 [main.dol; dolphin/os/OSAlarm.c]
+Return 0x8036bb6c: fmult(int, int) +0x48 [main.dol; Kyoto/Audio/g721.cpp]
+Return 0xffffeab3: unresolved (Unaligned PowerPC instruction address)
+Return 0x8036ba78: predictor_zero(g72x_state *) +0x48 [main.dol; Kyoto/Audio/g721.cpp]
+Return 0x8036b2e0: g721_decoder(int, g72x_state *) +0x28 [main.dol; Kyoto/Audio/g721.cpp]
+Return 0x8036bd24: CStaticAudioPlayer::DecodeMonoAndMix(unsigned short*, unsigned short*, int, int, int, int, int, g72x_state&) +0xc8 [main.dol; Kyoto/Audio/CStaticAudioPlayer.cpp]
+Return 0x8036be98: CStaticAudioPlayer::Decode(const unsigned short*, unsigned short*, int) +0xa8 [main.dol; Kyoto/Audio/CStaticAudioPlayer.cpp]
+
+Screenshot 6: prime-revision2.png
+Build: GM8E01_02 (identified)
+Unique full build string; modified code remains unverified.
+IP 0x00000000: unresolved (Outside known function ranges)
+Return 0x8030487c: rstl::advance_iterator<rstl::list<rstl::ncrc_ptr<CInstruction>, rstl::rmemory_allocator>::iterator, int>(rstl::list<rstl::ncrc_ptr<CInstruction>, rstl::rmemory_allocator>::iterator, int) +0x28 [main.dol; Kyoto/Text/CTextExecuteBuffer.cpp]
+Return 0x80341844: CToken::Lock() +0x28 [main.dol; Kyoto/CToken.cpp]
+Return 0x803417bc: CToken::operator=(const CToken&) +0x60 [main.dol; Kyoto/CToken.cpp]
+Return 0x802ff898: CSaveableState::operator=(const CSaveableState&) +0x10c [main.dol; Kyoto/Text/CFontRenderState.cpp]
+Return 0x80303aa8: CTextExecuteBuffer::AddPopState() +0x98 [main.dol; Kyoto/Text/CTextExecuteBuffer.cpp]
+Return 0x803056c8: CTextParser::ParseTag(CTextExecuteBuffer&, const wchar_t*, int, const rstl::vector<rstl::pair<unsigned int, unsigned int>, rstl::rmemory_allocator>*) +0x6a8 [main.dol; Kyoto/Text/CTextParser.cpp]
+Return 0x8030626c: CTextParser::ParseText(CTextExecuteBuffer&, const wchar_t*, int, const rstl::vector<rstl::pair<unsigned int, unsigned int>, rstl::rmemory_allocator>*) +0xd0 [main.dol; Kyoto/Text/CTextParser.cpp]
+Return 0x802c9f3c: CGuiTextSupport::CheckAndRebuildTextBuffer() const +0x218 [main.dol; GuiSys/CGuiTextSupport.cpp]
+Return 0x802c9598: CGuiTextSupport::CheckAndRebuildRenderBuffer() const +0x50 [main.dol; GuiSys/CGuiTextSupport.cpp]
+
+Screenshot 7: echoes-object-list.png
+Build: G2ME01 (identified)
+IP consistent with main executable sections
+Unique full build string; modified code remains unverified.
+IP 0x8028c36c: rs_debugger_printf(char const *, ...) +0xe0 [main.dol; Kyoto/Basics/RAssertDolphin.cpp]
+Return 0x8028c384: rs_debugger_printf(char const *, ...) +0xf8 [main.dol; Kyoto/Basics/RAssertDolphin.cpp]
+Return 0x800425e8: CStateManager::AllocateUniqueId() +0x68 [main.dol; MetroidPrime/CStateManager.cpp]
+Return 0x800d1a10: fn_800D1060 +0x9b0 [main.dol; MetroidPrime/ScriptObjects/CScriptDebris.cpp]
+Return 0x8023420c: CScriptObjectLoaderHelper::LoadScriptObject(TAreaId, unsigned int, unsigned int, CInputStream&, CStateManager&) +0x24c [main.dol; MetroidPrime/CScriptObjectLoaderHelper.cpp]
+Return 0x80233f34: CScriptObjectLoaderHelper::GenerateScriptObject(const TEditorId&, CStateManager&) +0xdc [main.dol; MetroidPrime/CScriptObjectLoaderHelper.cpp]
+Return 0x800a4ecc: CScriptGenerator::AcceptScriptMsg(CStateManager&, const CScriptMsg&) +0x3ac [main.dol; MetroidPrime/ScriptObjects/CScriptGenerator.cpp]
+Return 0x8003bef0: CStateManager::fn_8003BE54() +0x9c [main.dol; MetroidPrime/CStateManager.cpp]
+Return 0x8003bddc: fn_8003BDB4 +0x28 [main.dol; MetroidPrime/CStateManager.cpp]
+Return 0x8003f450: CStateManager::Update(float, CArchitectureQueue&) +0x598 [main.dol; MetroidPrime/CStateManager.cpp]
+
+Bundle: fe551f8cdaaff912632358f3c6cb3ecc16ff22c550cd459a3d568228ae7b357f

@@ -1,0 +1,126 @@
+[
+  {
+    "file": "prime-allocation.png",
+    "build": "GM8E01_00",
+    "ip": "802d68c8",
+    "returns": [
+      "802d68e0",
+      "80315a10",
+      "803395e0",
+      "80339a64",
+      "80339c84",
+      "80004d80",
+      "80005644",
+      "80008558"
+    ],
+    "ip_symbol": "rs_debugger_printf__FPCce",
+    "ip_offset": 156
+  },
+  {
+    "file": "echoes-allocation.png",
+    "build": "G2ME01",
+    "ip": "8028c36c",
+    "returns": [
+      "8028c384",
+      "802ce49c",
+      "802c4c34",
+      "802c5e20",
+      "802c48c0",
+      "802f9318",
+      "802fa274",
+      "802fa44c"
+    ],
+    "ip_symbol": "rs_debugger_printf__FPCce",
+    "ip_offset": 224
+  },
+  {
+    "file": "echoes-exception.png",
+    "build": "G2ME01",
+    "ip": "802b3f90",
+    "returns": [
+      "806bf338",
+      "802b807c",
+      "802b9d24",
+      "802ba600",
+      "8027c964",
+      "8027c17c",
+      "8027d008",
+      "80020b2c",
+      "80021378"
+    ],
+    "ip_symbol": "__as__18CDrawStringOptionsFRC18CDrawStringOptions",
+    "ip_offset": 48
+  },
+  {
+    "file": "prime-exception.png",
+    "build": "GM8E01_00",
+    "ip": "80351718",
+    "returns": [
+      "80315978",
+      "80351950",
+      "80315978",
+      "800557bc",
+      "800b5470",
+      "8004c210",
+      "8004aba0",
+      "80024858",
+      "80052214"
+    ],
+    "ip_symbol": "FreeNormalAllocation__14CGameAllocatorFPCv",
+    "ip_offset": 24
+  },
+  {
+    "file": "prime-loop.png",
+    "build": "GM8E01_00",
+    "ip": "802d68c8",
+    "returns": [
+      "802d68e0",
+      "800075b4",
+      "8037e700",
+      "8036bb6c",
+      "ffffeab3",
+      "8036ba78",
+      "8036b2e0",
+      "8036bd24",
+      "8036be98"
+    ],
+    "ip_symbol": "rs_debugger_printf__FPCce",
+    "ip_offset": 156
+  },
+  {
+    "file": "prime-revision2.png",
+    "build": "GM8E01_02",
+    "ip": "00000000",
+    "returns": [
+      "8030487c",
+      "80341844",
+      "803417bc",
+      "802ff898",
+      "80303aa8",
+      "803056c8",
+      "8030626c",
+      "802c9f3c",
+      "802c9598"
+    ],
+    "ip_symbol": null,
+    "ip_offset": null
+  },
+  {
+    "file": "echoes-object-list.png",
+    "build": "G2ME01",
+    "ip": "8028c36c",
+    "returns": [
+      "8028c384",
+      "800425e8",
+      "800d1a10",
+      "8023420c",
+      "80233f34",
+      "800a4ecc",
+      "8003bef0",
+      "8003bddc",
+      "8003f450"
+    ],
+    "ip_symbol": "rs_debugger_printf__FPCce",
+    "ip_offset": 224
+  }
+]

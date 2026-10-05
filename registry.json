@@ -1,0 +1,7 @@
+{
+  "GM8E01_00": {"build_strings": ["Build v1.088 10/29/2002 2:21:25"], "screenshot_parsing": true, "automatic_detection": true},
+  "GM8E01_01": {"build_strings": ["Build v1.093 11/5/2002 19:50:01"]},
+  "GM8E01_02": {"build_strings": ["Build v1.111 3/10/2003 17:56:21"], "screenshot_parsing": true, "automatic_detection": true},
+  "GM8P01_00": {"build_strings": ["Build v1.110 2/4/2003 22:16:07"]},
+  "G2ME01": {"build_strings": ["Build v1.028 10/18/2004 10:44:32"], "screenshot_parsing": true, "automatic_detection": true}
+}
