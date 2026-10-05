@@ -19,6 +19,7 @@ from crash_decoder.bot import (
 )
 from crash_decoder.jobs import BusyError, JobQueue
 from crash_decoder.models import Result
+from crash_decoder.report import render_screenshot
 
 
 def interaction(user=1):
@@ -58,6 +59,7 @@ def test_collect_images_and_deduplicate():
 
 @pytest.mark.parametrize("channel_type", [discord.TextChannel, discord.Thread])
 @pytest.mark.parametrize("attach_diagnostics", [False, True])
+@pytest.mark.parametrize("count", [1, 2])
 @pytest.mark.parametrize(
     "header",
     [
@@ -66,7 +68,7 @@ def test_collect_images_and_deduplicate():
     ],
 )
 async def test_one_actual_reply_and_private_link(
-    bundle, decoder, channel_type, header, attach_diagnostics
+    bundle, decoder, channel_type, header, attach_diagnostics, count
 ):
     bot = CrashBot(bundle, attach_diagnostics=attach_diagnostics)
     command = bot.tree.get_command("Decode crash", type=discord.AppCommandType.message)
@@ -92,7 +94,7 @@ async def test_one_actual_reply_and_private_link(
 
     async def submit(*args):
         request.response.defer.assert_awaited_once_with(ephemeral=True, thinking=True)
-        return [result, Result("bad", error="Unreadable image")]
+        return [result] + ([Result("bad", error="Unreadable image")] if count == 2 else [])
 
     bot.jobs.submit = AsyncMock(side_effect=submit)
     try:
@@ -102,9 +104,17 @@ async def test_one_actual_reply_and_private_link(
         arguments = json.loads(params.multipart[0]["value"]) if params.multipart else params.payload
         assert arguments["allowed_mentions"] == {"parse": [], "replied_user": False}
         assert arguments["message_reference"] == {"message_id": 101, "channel_id": 2, "guild_id": 1}
-        assert "Unreadable image" in arguments["content"]
+        expected_content = (
+            f"```objectivec\n{render_screenshot(result, 1, include_heading=False)}\n```"
+            if count == 1
+            else ""
+        )
+        assert arguments["content"] == expected_content
         filenames = {attachment["filename"] for attachment in arguments.get("attachments", [])}
-        assert {"crash-trace-1.txt", "crash-trace-2.txt"} <= filenames
+        expected_files = {"crash-trace-1.txt", "crash-trace-2.txt"} if count == 2 else set()
+        if attach_diagnostics:
+            expected_files.add("crash-diagnostic.json")
+        assert filenames == expected_files
         assert ("crash-diagnostic.json" in filenames) is attach_diagnostics
         response = request.edit_original_response.call_args.kwargs
         assert reply.jump_url in response["content"]
@@ -137,7 +147,7 @@ def test_individual_traces_and_large_batches(decoder, attach_diagnostics, count)
     data = payload(results, attach_diagnostics=attach_diagnostics)
     try:
         assert len(data["content"]) <= 2000
-        assert all(f"Screenshot {i}:" in data["content"] for i in range(1, count + 1))
+        assert data["content"] == ""
         trace_names = {f"crash-trace-{i}.txt" for i in range(1, count + 1)}
         archived = count + int(attach_diagnostics) > 10
         expected = {"crash-traces.zip"} if archived else trace_names.copy()
@@ -202,6 +212,7 @@ async def test_corrections_use_existing_text_preserve_original_and_modal_index(
     assert view.results[1] is results[1]
     assert view.results[0].resolutions[0].offset == 0
     filenames = {attachment.filename for attachment in reply.edit.call_args.kwargs["attachments"]}
+    assert reply.edit.call_args.kwargs["content"] == ""
     assert {"crash-trace-1.txt", "crash-trace-2.txt"} <= filenames
     first_trace = reply.edit.call_args.kwargs["attachments"][0].fp.read().decode()
     assert first_trace.startswith("Screenshot 1: first - GM8E01_00")
@@ -211,6 +222,35 @@ async def test_corrections_use_existing_text_preserve_original_and_modal_index(
     denied = interaction(user=2)
     assert not await view.interaction_check(denied)
     denied.response.send_message.assert_awaited_once()
+
+
+@pytest.mark.parametrize("attach_diagnostics", [False, True])
+async def test_single_trace_correction_switches_between_body_and_attachment(
+    decoder, attach_diagnostics
+):
+    result = decoder.text("IP: 0x80003100", "image.png")
+    reply = SimpleNamespace(jump_url="link", edit=AsyncMock())
+    view = CorrectionView(decoder, [result], reply, owner=1, attach_diagnostics=attach_diagnostics)
+    long_text = "IP: 0x80003100\n" + "0x805bf000: 0x805bf100 0x80003100\n" * 100
+    for text, inline in [(long_text, False), ("IP: 0x80003100", True)]:
+        await view.rerun(interaction(), selected="GM8E01_00", corrected=text)
+        data = reply.edit.call_args.kwargs
+        assert len(data["content"]) <= 2000
+        assert data["content"].startswith("```objectivec\n") is inline
+        assert "Screenshot 1:" not in data["content"]
+        filenames = {f.filename for f in data["attachments"]}
+        assert ("crash-trace-1.txt" in filenames) is not inline
+        assert ("crash-diagnostic.json" in filenames) is attach_diagnostics
+        for file in data["attachments"]:
+            file.close()
+
+
+def test_inline_trace_cannot_close_its_code_block(decoder):
+    result = decoder.text("Exception 2 ```\nIP: 0x80003100", "image.png")
+    data = payload([result])
+    assert data["files"] == []
+    assert data["content"].count("```") == 2
+    assert "``\u200b`" in data["content"]
 
 
 @pytest.mark.parametrize(

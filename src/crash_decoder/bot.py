@@ -17,7 +17,7 @@ from .decoder import Decoder
 from .jobs import BusyError, JobQueue
 from .layout import parse_layout
 from .models import Result
-from .report import diagnostic, discord_summary, render_screenshot
+from .report import diagnostic, render_screenshot
 
 log = logging.getLogger(__name__)
 HEALTH = Path("/tmp/crash-decoder-health") if os.name != "nt" else Path(".cache/health")
@@ -49,27 +49,38 @@ def collect_images(message: discord.Message) -> list[tuple[str, str]]:
 
 
 def payload(results: list[Result], *, attach_diagnostics: bool = False) -> dict:
-    traces = [
-        (f"crash-trace-{number}.txt", render_screenshot(result, number).encode())
-        for number, result in enumerate(results, 1)
-    ]
+    content = ""
+    if len(results) == 1:
+        trace = render_screenshot(results[0], 1, include_heading=False)
+        # Keep OCR text from closing the code block.
+        inline = "```objectivec\n" + trace.replace("```", "``\u200b`") + "\n```"
+        if len(inline) <= 2000:
+            content = inline
+    traces = (
+        []
+        if content
+        else [
+            (f"crash-trace-{number}.txt", render_screenshot(result, number).encode())
+            for number, result in enumerate(results, 1)
+        ]
+    )
     files = []
     # Discord permits ten files per message; keep larger batches in one reply.
     if len(traces) + int(attach_diagnostics) > 10:
         archive = io.BytesIO()
         with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_DEFLATED) as zipped:
-            for filename, content in traces:
-                zipped.writestr(filename, content)
+            for filename, trace_data in traces:
+                zipped.writestr(filename, trace_data)
         archive.seek(0)
         files.append(discord.File(archive, filename="crash-traces.zip"))
     else:
-        files.extend(discord.File(io.BytesIO(content), filename=name) for name, content in traces)
+        files.extend(
+            discord.File(io.BytesIO(trace_data), filename=name) for name, trace_data in traces
+        )
     if attach_diagnostics:
         files.append(
             discord.File(io.BytesIO(diagnostic(results).encode()), filename="crash-diagnostic.json")
         )
-    # Escaping can double the text length; reserve room for all twenty screenshot rows.
-    content = discord.utils.escape_markdown(discord_summary(results, limit=900))
     return {"content": content, "files": files, "allowed_mentions": discord.AllowedMentions.none()}
 
 

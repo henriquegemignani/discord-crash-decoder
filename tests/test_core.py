@@ -89,7 +89,8 @@ def test_module_safety(bundle):
     runtime = {"AIMannedTurret": {".text": 0x81000000}}
     address = Frame(0x81000000 + fn["address"], "return", "", module="AIMannedTurret")
     assert resolver.resolve(address).symbol is None
-    assert resolver.resolve(address, runtime).symbol == "RELMain"
+    resolved = resolver.resolve(address, runtime)
+    assert resolved.symbol == "RELMain" and resolved.binary_kind == "rel"
     anonymous = Frame(address.address, "ip", "")
     assert resolver.resolve(anonymous, runtime).symbol == "RELMain"
     offset = Frame(0x100 + fn["address"], "module_offset", "", module="AIMannedTurret.rel")

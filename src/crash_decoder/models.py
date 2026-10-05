@@ -49,6 +49,7 @@ class Resolution:
     binary: str | None = None
     source: str | None = None
     reason: str | None = None
+    binary_kind: Literal["dol", "rel"] | None = None
 
 
 @dataclass

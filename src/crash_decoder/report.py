@@ -12,8 +12,8 @@ def heading(result: Result, number: int) -> str:
     return f"Screenshot {number}: {result.label} - {build}"
 
 
-def render_screenshot(result: Result, number: int) -> str:
-    lines = [heading(result, number)]
+def render_screenshot(result: Result, number: int, *, include_heading: bool = True) -> str:
+    lines = [heading(result, number)] if include_heading else []
     if result.error:
         lines.append(result.error)
     if result.crash and result.crash.exception:
@@ -29,9 +29,14 @@ def render_screenshot(result: Result, number: int) -> str:
                 else f"0x{frame.address:08x}"
             )
             line = f"{address}: unresolved ({resolution.reason or 'no matching symbol'})"
-        if resolution.binary:
-            line += f" [{resolution.binary}"
-            line += f"; {resolution.source}]" if resolution.source else "]"
+        locations = []
+        if resolution.binary_kind == "rel" and resolution.binary:
+            module = resolution.binary
+            locations.append(module if module.endswith(".rel") else f"{module}.rel")
+        if resolution.source:
+            locations.append(resolution.source)
+        if locations:
+            line += f" [{'; '.join(locations)}]"
         lines.append(line)
     return "\n".join(lines)
 
@@ -44,15 +49,3 @@ def render(results: list[Result]) -> str:
 
 def diagnostic(results: list[Result]) -> str:
     return json.dumps([asdict(result) for result in results], indent=2)
-
-
-def discord_summary(results: list[Result], *, limit: int = 1750) -> str:
-    # Budget each row so every screenshot remains represented in the summary.
-    budget = max(1, (limit - len(results) + 1) // max(1, len(results)))
-    lines = []
-    for number, result in enumerate(results, 1):
-        line = heading(result, number)
-        if result.error:
-            line += f": {result.error}"
-        lines.append(line if len(line) <= budget else line[: budget - 1] + "…")
-    return "\n".join(lines)

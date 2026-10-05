@@ -85,5 +85,11 @@ class Resolver:
             return Resolution(frame, reason=reason)
         binary, func, offset = matches[0]
         return Resolution(
-            frame, demangle(func["name"]), func["name"], offset, binary["id"], func.get("source")
+            frame,
+            demangle(func["name"]),
+            func["name"],
+            offset,
+            binary["id"],
+            func.get("source"),
+            binary_kind=binary["kind"],
         )

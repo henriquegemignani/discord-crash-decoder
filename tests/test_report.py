@@ -37,10 +37,11 @@ def test_compact_trace_matches_requested_format():
     expected = (
         "Screenshot 1: image.png - GM8E01_00\n"
         "Alloc failed — Size: -419500209 -— Produc\n"
-        "rs_debugger_printf(char const *, ...) +0x9c [main.dol; Kyoto/Basics/RAssertDolphin.cpp]\n"
-        "main +0x54 [main.dol; MetroidPrime/main.cpp]"
+        "rs_debugger_printf(char const *, ...) +0x9c [Kyoto/Basics/RAssertDolphin.cpp]\n"
+        "main +0x54 [MetroidPrime/main.cpp]"
     )
     assert render_screenshot(result, 1) == expected
+    assert render_screenshot(result, 1, include_heading=False) == expected.split("\n", 1)[1]
     assert render([result, result]) == expected + "\n\n" + expected.replace(
         "Screenshot 1", "Screenshot 2"
     )
@@ -76,3 +77,29 @@ def test_unresolved_addresses_and_module_offsets_remain_visible():
 def test_failed_image_has_its_own_trace():
     result = Result("bad.png", error="Unreadable image")
     assert render_screenshot(result, 3) == "Screenshot 3: bad.png - unknown build\nUnreadable image"
+
+
+def test_only_rel_modules_are_named_in_stack_locations():
+    result = Result(
+        "module.png",
+        resolutions=[
+            Resolution(
+                Frame(0x81000000, "return", ""),
+                symbol="RELMain",
+                offset=0,
+                binary="AIMannedTurret",
+                source="MetroidPrime/AIMannedTurret/RELMain.cpp",
+                binary_kind="rel",
+            ),
+            Resolution(
+                Frame(0x80003100, "ip", ""),
+                symbol="__start",
+                offset=0,
+                binary="rs5mp1_p.dol",
+                binary_kind="dol",
+            ),
+        ],
+    )
+    assert render_screenshot(result, 1, include_heading=False) == (
+        "RELMain +0x0 [AIMannedTurret.rel; MetroidPrime/AIMannedTurret/RELMain.cpp]\n__start +0x0"
+    )
