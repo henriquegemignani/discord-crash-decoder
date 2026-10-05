@@ -4,6 +4,9 @@ A Python bot and local decoder for Metroid Prime and Echoes crash screens. Right
 message, choose **Apps → Decode crash**, and receive one reply containing every screenshot's
 result. The bot acknowledges privately before downloading or running OCR. Private controls
 let the requester select a game/build, correct OCR text, and supply verified REL layout data.
+Every posted result includes `crash-diagnostic.json`, including debug/custom builds, unknown
+builds, and per-image decode errors. It preserves OCR text and raw addresses even when no
+symbol map can be selected.
 
 The included registry maps 15 GameCube/Wii configurations. Screenshot parsing and automatic
 detection are verified against the seven supplied screenshots for **GM8E01_00, GM8E01_02,

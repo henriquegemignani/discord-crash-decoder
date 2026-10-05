@@ -49,7 +49,14 @@ def test_collect_images_and_deduplicate():
 
 
 @pytest.mark.parametrize("channel_type", [discord.TextChannel, discord.Thread])
-async def test_one_actual_reply_and_private_link(bundle, decoder, channel_type):
+@pytest.mark.parametrize(
+    "header",
+    [
+        "Build v1.088 10/29/2002 2:21:25",
+        "Exception 2 - Debug\nBuild v9.999 1/1/2099 1:00:00",
+    ],
+)
+async def test_one_actual_reply_and_private_link(bundle, decoder, channel_type, header):
     bot = CrashBot(bundle)
     command = bot.tree.get_command("Decode crash", type=discord.AppCommandType.message)
     assert command is not None and not bot.intents.message_content
@@ -70,7 +77,7 @@ async def test_one_actual_reply_and_private_link(bundle, decoder, channel_type):
         state,
     )
     selected.attachments, selected.embeds = [attachment()], []
-    result = decoder.text("Build v1.088 10/29/2002 2:21:25\nIP: 0x802d68c8")
+    result = decoder.text(f"{header}\nIP: 0x802d68c8")
 
     async def submit(*args):
         request.response.defer.assert_awaited_once_with(ephemeral=True, thinking=True)
@@ -85,6 +92,9 @@ async def test_one_actual_reply_and_private_link(bundle, decoder, channel_type):
         assert arguments["allowed_mentions"] == {"parse": [], "replied_user": False}
         assert arguments["message_reference"] == {"message_id": 101, "channel_id": 2, "guild_id": 1}
         assert "Unreadable image" in arguments["content"]
+        assert "crash-diagnostic.json" in {
+            attachment["filename"] for attachment in arguments["attachments"]
+        }
         response = request.edit_original_response.call_args.kwargs
         assert reply.jump_url in response["content"]
         assert response["view"].owner == request.user.id
@@ -113,6 +123,29 @@ def test_long_report_attached(decoder):
     data = payload(results)
     assert len(data["content"]) <= 2000
     assert {f.filename for f in data["files"]} == {"crash-trace.txt", "crash-diagnostic.json"}
+
+
+def test_diagnostics_preserve_debug_unknown_and_failed_results(decoder):
+    text = "Exception 2 - Debug\nBuild v9.999 1/1/2099 1:00:00\nIP: 0x802d68c8"
+    results = [
+        decoder.text(text, "debug.png"),
+        decoder.text("IP: 0x80003100", "unknown.png"),
+        Result("failed.png", error="Unreadable image", bundle_checksum=decoder.bundle["checksum"]),
+    ]
+    data = payload(results)
+    try:
+        attachment = next(f for f in data["files"] if f.filename == "crash-diagnostic.json")
+        diagnostics = json.loads(attachment.fp.read())
+        assert diagnostics[0]["crash"]["original_text"] == text
+        assert diagnostics[0]["crash"]["ip"]["address"] == 0x802D68C8
+        assert diagnostics[0]["detection"]["status"] == "unknown"
+        assert diagnostics[0]["resolutions"][0]["symbol"] is None
+        assert diagnostics[1]["detection"]["build_id"] is None
+        assert diagnostics[2]["error"] == "Unreadable image"
+        assert all(d["bundle_checksum"] == decoder.bundle["checksum"] for d in diagnostics)
+    finally:
+        for attachment in data["files"]:
+            attachment.close()
 
 
 async def test_corrections_use_existing_text_preserve_original_and_modal_index(decoder):
