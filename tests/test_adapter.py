@@ -2,13 +2,20 @@ import asyncio
 import copy
 import json
 from types import SimpleNamespace
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, Mock
 
 import discord
 import httpx
 import pytest
 
-from crash_decoder.bot import CorrectionModal, CorrectionView, CrashBot, collect_images, payload
+from crash_decoder.bot import (
+    CorrectionModal,
+    CorrectionView,
+    CrashBot,
+    collect_images,
+    payload,
+    run,
+)
 from crash_decoder.jobs import BusyError, JobQueue
 from crash_decoder.models import Result
 
@@ -49,6 +56,7 @@ def test_collect_images_and_deduplicate():
 
 
 @pytest.mark.parametrize("channel_type", [discord.TextChannel, discord.Thread])
+@pytest.mark.parametrize("attach_diagnostics", [False, True])
 @pytest.mark.parametrize(
     "header",
     [
@@ -56,8 +64,10 @@ def test_collect_images_and_deduplicate():
         "Exception 2 - Debug\nBuild v9.999 1/1/2099 1:00:00",
     ],
 )
-async def test_one_actual_reply_and_private_link(bundle, decoder, channel_type, header):
-    bot = CrashBot(bundle)
+async def test_one_actual_reply_and_private_link(
+    bundle, decoder, channel_type, header, attach_diagnostics
+):
+    bot = CrashBot(bundle, attach_diagnostics=attach_diagnostics)
     command = bot.tree.get_command("Decode crash", type=discord.AppCommandType.message)
     assert command is not None and not bot.intents.message_content
     request = interaction()
@@ -88,16 +98,16 @@ async def test_one_actual_reply_and_private_link(bundle, decoder, channel_type, 
         await bot.decode_crash(request, selected)
         state.http.send_message.assert_awaited_once()
         params = state.http.send_message.call_args.kwargs["params"]
-        arguments = json.loads(params.multipart[0]["value"])
+        arguments = json.loads(params.multipart[0]["value"]) if params.multipart else params.payload
         assert arguments["allowed_mentions"] == {"parse": [], "replied_user": False}
         assert arguments["message_reference"] == {"message_id": 101, "channel_id": 2, "guild_id": 1}
         assert "Unreadable image" in arguments["content"]
-        assert "crash-diagnostic.json" in {
-            attachment["filename"] for attachment in arguments["attachments"]
-        }
+        filenames = {attachment["filename"] for attachment in arguments.get("attachments", [])}
+        assert ("crash-diagnostic.json" in filenames) is attach_diagnostics
         response = request.edit_original_response.call_args.kwargs
         assert reply.jump_url in response["content"]
         assert response["view"].owner == request.user.id
+        assert response["view"].attach_diagnostics is attach_diagnostics
     finally:
         await bot.close()
 
@@ -118,11 +128,15 @@ async def test_private_error_when_cannot_reply(bundle, decoder):
         await bot.close()
 
 
-def test_long_report_attached(decoder):
+@pytest.mark.parametrize("attach_diagnostics", [False, True])
+def test_long_report_attached(decoder, attach_diagnostics):
     results = [decoder.text("IP: 0x80003100", "X" * 150) for _ in range(20)]
-    data = payload(results)
+    data = payload(results, attach_diagnostics=attach_diagnostics)
     assert len(data["content"]) <= 2000
-    assert {f.filename for f in data["files"]} == {"crash-trace.txt", "crash-diagnostic.json"}
+    expected = {"crash-trace.txt"}
+    if attach_diagnostics:
+        expected.add("crash-diagnostic.json")
+    assert {f.filename for f in data["files"]} == expected
 
 
 def test_diagnostics_preserve_debug_unknown_and_failed_results(decoder):
@@ -132,7 +146,7 @@ def test_diagnostics_preserve_debug_unknown_and_failed_results(decoder):
         decoder.text("IP: 0x80003100", "unknown.png"),
         Result("failed.png", error="Unreadable image", bundle_checksum=decoder.bundle["checksum"]),
     ]
-    data = payload(results)
+    data = payload(results, attach_diagnostics=True)
     try:
         attachment = next(f for f in data["files"] if f.filename == "crash-diagnostic.json")
         diagnostics = json.loads(attachment.fp.read())
@@ -148,11 +162,14 @@ def test_diagnostics_preserve_debug_unknown_and_failed_results(decoder):
             attachment.close()
 
 
-async def test_corrections_use_existing_text_preserve_original_and_modal_index(decoder):
+@pytest.mark.parametrize("attach_diagnostics", [False, True])
+async def test_corrections_use_existing_text_preserve_original_and_modal_index(
+    decoder, attach_diagnostics
+):
     initial = "IP: 0x80003100"
     results = [decoder.text(initial, "first"), decoder.text("IP: 0x80003140", "second")]
     reply = SimpleNamespace(jump_url="https://discord.com/channels/1/2/3", edit=AsyncMock())
-    view = CorrectionView(decoder, results, reply, owner=1)
+    view = CorrectionView(decoder, results, reply, owner=1, attach_diagnostics=attach_diagnostics)
     modal = CorrectionModal(view)
     view.index = 1
     assert modal.index == 0
@@ -162,9 +179,30 @@ async def test_corrections_use_existing_text_preserve_original_and_modal_index(d
     assert view.results[0].detection.build_id == "GM8E01_00"
     assert view.results[1] is results[1]
     assert view.results[0].resolutions[0].offset == 0
+    filenames = {attachment.filename for attachment in reply.edit.call_args.kwargs["attachments"]}
+    assert ("crash-diagnostic.json" in filenames) is attach_diagnostics
     denied = interaction(user=2)
     assert not await view.interaction_check(denied)
     denied.response.send_message.assert_awaited_once()
+
+
+@pytest.mark.parametrize(
+    ("setting", "expected"), [(None, False), ("false", False), ("true", True), ("1", True)]
+)
+def test_runtime_diagnostic_setting(monkeypatch, setting, expected):
+    monkeypatch.setenv("DISCORD_TOKEN", "test-token")
+    if setting is None:
+        monkeypatch.delenv("ATTACH_DIAGNOSTICS", raising=False)
+    else:
+        monkeypatch.setenv("ATTACH_DIAGNOSTICS", setting)
+    bundle = {"builds": []}
+    monkeypatch.setattr("crash_decoder.bot.load", lambda path: bundle)
+    constructor = Mock(return_value=SimpleNamespace(run=Mock()))
+    monkeypatch.setattr("crash_decoder.bot.CrashBot", constructor)
+    run()
+    assert constructor.call_args.kwargs["attach_diagnostics"] is expected
+    assert constructor.call_args.args == (bundle,)
+    constructor.return_value.run.assert_called_once()
 
 
 async def test_private_selector_pages_custom_maps(decoder):

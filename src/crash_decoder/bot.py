@@ -47,16 +47,18 @@ def collect_images(message: discord.Message) -> list[tuple[str, str]]:
     return unique
 
 
-def payload(results: list[Result]) -> dict:
+def payload(results: list[Result], *, attach_diagnostics: bool = False) -> dict:
     summary, full = discord_summary(results)
-    files = [
-        discord.File(io.BytesIO(diagnostic(results).encode()), filename="crash-diagnostic.json")
-    ]
+    files = []
+    if attach_diagnostics:
+        files.append(
+            discord.File(io.BytesIO(diagnostic(results).encode()), filename="crash-diagnostic.json")
+        )
     if full:
         files.insert(0, discord.File(io.BytesIO(full.encode()), filename="crash-trace.txt"))
     content = discord.utils.escape_markdown(summary)
     if len(content) > 2000:
-        content = "Crash decode — full trace and diagnostic JSON attached."
+        content = "Crash decode — full trace attached."
         if not full:
             files.insert(0, discord.File(io.BytesIO(summary.encode()), filename="crash-trace.txt"))
     return {"content": content, "files": files, "allowed_mentions": discord.AllowedMentions.none()}
@@ -102,9 +104,10 @@ class CorrectionModal(discord.ui.Modal, title="Correct OCR text"):
 
 
 class CorrectionView(discord.ui.View):
-    def __init__(self, decoder, results, reply, owner):
+    def __init__(self, decoder, results, reply, owner, *, attach_diagnostics=False):
         super().__init__(timeout=600)
         self.decoder, self.results, self.reply, self.owner = decoder, results, reply, owner
+        self.attach_diagnostics = attach_diagnostics
         self.index = 0
         self.selected = {}
         self.build_page = 0
@@ -189,7 +192,7 @@ class CorrectionView(discord.ui.View):
                 result.crash.ocr_passes = old.crash.ocr_passes
             updated = list(self.results)
             updated[index] = result
-            data = payload(updated)
+            data = payload(updated, attach_diagnostics=self.attach_diagnostics)
             try:
                 await self.reply.edit(
                     content=data["content"],
@@ -210,11 +213,12 @@ class CorrectionView(discord.ui.View):
 
 
 class CrashBot(discord.Client):
-    def __init__(self, bundle, *, workers=2, capacity=8):
+    def __init__(self, bundle, *, workers=2, capacity=8, attach_diagnostics=False):
         super().__init__(
             intents=discord.Intents.none(), allowed_mentions=discord.AllowedMentions.none()
         )
         self.decoder = Decoder(bundle)
+        self.attach_diagnostics = attach_diagnostics
         self.jobs = JobQueue(self.decoder, workers, capacity)
         self.http_client = httpx.AsyncClient(timeout=httpx.Timeout(20), trust_env=False)
         self.tree = app_commands.CommandTree(self)
@@ -290,7 +294,9 @@ class CrashBot(discord.Client):
                 ),
                 timeout=600,
             )
-            reply = await message.reply(**payload(results), mention_author=False)
+            reply = await message.reply(
+                **payload(results, attach_diagnostics=self.attach_diagnostics), mention_author=False
+            )
         except BusyError as exc:
             await interaction.edit_original_response(content=str(exc))
             return
@@ -311,7 +317,13 @@ class CrashBot(discord.Client):
             log.exception("Decode request failed")
             await interaction.edit_original_response(content="Decode failed; check the bot logs.")
             return
-        view = CorrectionView(self.decoder, results, reply, interaction.user.id)
+        view = CorrectionView(
+            self.decoder,
+            results,
+            reply,
+            interaction.user.id,
+            attach_diagnostics=self.attach_diagnostics,
+        )
         await interaction.edit_original_response(
             content=(
                 f"Decoded: {reply.jump_url}\nUse the controls below to choose a map or edit OCR."
@@ -329,5 +341,7 @@ def run():
         bundle,
         workers=int(os.getenv("OCR_WORKERS", "2")),
         capacity=int(os.getenv("QUEUE_CAPACITY", "8")),
+        attach_diagnostics=os.getenv("ATTACH_DIAGNOSTICS", "false").strip().lower()
+        in {"1", "true", "yes", "on"},
     )
     bot.run(token, log_level=logging.INFO)

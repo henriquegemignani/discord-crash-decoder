@@ -55,7 +55,7 @@ def parse(text: str, *, original_text: str | None = None) -> Crash:
             else:
                 crash.warnings.append(f"Unparsed stack row: {line.strip()}")
     if original_text is not None and text != original_text:
-        crash.corrections.insert(0, "Text corrected; original preserved in diagnostic JSON.")
+        crash.corrections.insert(0, "Text corrected; original OCR preserved.")
     if not crash.readable:
         crash.warnings.append("No complete instruction pointer or stack address found.")
     return crash

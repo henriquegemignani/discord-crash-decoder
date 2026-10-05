@@ -4,9 +4,10 @@ A Python bot and local decoder for Metroid Prime and Echoes crash screens. Right
 message, choose **Apps → Decode crash**, and receive one reply containing every screenshot's
 result. The bot acknowledges privately before downloading or running OCR. Private controls
 let the requester select a game/build, correct OCR text, and supply verified REL layout data.
-Every posted result includes `crash-diagnostic.json`, including debug/custom builds, unknown
-builds, and per-image decode errors. It preserves OCR text and raw addresses even when no
-symbol map can be selected.
+Diagnostic JSON attachments are disabled by default. Set `ATTACH_DIAGNOSTICS=true` on a debug
+instance to attach `crash-diagnostic.json` to replies and corrections. This runtime setting
+applies to every decoded game build, including unknown builds and per-image errors. Long
+text traces are still attached when needed in production.
 
 The included registry maps 15 GameCube/Wii configurations. Screenshot parsing and automatic
 detection are verified against the seven supplied screenshots for **GM8E01_00, GM8E01_02,
@@ -71,6 +72,10 @@ types, build identities and bundle versions rather than image contents or signed
 For a local non-Docker bot, set `DISCORD_TOKEN` (and optionally `DISCORD_GUILD_ID`) in the
 process environment and run `uv run crash-decoder bot`. `.env` is consumed by Compose; the
 Python CLI does not automatically load it.
+
+To enable diagnostic attachments in Docker, set `ATTACH_DIAGNOSTICS=true` in `.env` and run
+`docker compose up -d --build`. Set it back to `false` and repeat the command for production.
+The local decoder's `--json` option remains available independently of this setting.
 
 ## Update symbols and register custom builds
 
